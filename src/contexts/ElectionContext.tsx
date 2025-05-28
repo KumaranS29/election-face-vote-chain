@@ -8,30 +8,35 @@ interface Candidate {
   name: string;
   email: string;
   party: string;
-  manifesto: string;
+  manifesto: string | null;
   election_id: string;
   votes: number;
-  image_url?: string;
+  image_url?: string | null;
+  user_id: string | null;
+  created_at: string;
 }
 
 interface Election {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   start_date: string;
   end_date: string;
   status: 'upcoming' | 'active' | 'completed';
   candidates: Candidate[];
   total_votes: number;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface Vote {
   id: string;
-  election_id: string;
-  candidate_id: string;
-  voter_id: string;
-  timestamp: string;
-  verified: boolean;
+  election_id: string | null;
+  candidate_id: string | null;
+  voter_id: string | null;
+  timestamp: string | null;
+  verified: boolean | null;
   face_verification_data?: any;
 }
 
@@ -39,8 +44,8 @@ interface ElectionContextType {
   elections: Election[];
   votes: Vote[];
   loading: boolean;
-  createElection: (election: Omit<Election, 'id' | 'candidates' | 'total_votes'>) => Promise<boolean>;
-  addCandidate: (candidate: Omit<Candidate, 'id' | 'votes'>) => Promise<boolean>;
+  createElection: (election: Omit<Election, 'id' | 'candidates' | 'total_votes' | 'created_by' | 'created_at' | 'updated_at'>) => Promise<boolean>;
+  addCandidate: (candidate: Omit<Candidate, 'id' | 'votes' | 'created_at'>) => Promise<boolean>;
   submitVote: (electionId: string, candidateId: string, voterId: string, faceData?: any) => Promise<boolean>;
   getElectionResults: (electionId: string) => { candidate: Candidate; percentage: number }[];
   updateElectionStatus: (electionId: string, status: Election['status']) => Promise<boolean>;
@@ -82,7 +87,7 @@ export const ElectionProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return {
             ...election,
             candidates: candidates || []
-          };
+          } as Election;
         })
       );
 
@@ -120,7 +125,7 @@ export const ElectionProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [user]);
 
-  const createElection = async (electionData: Omit<Election, 'id' | 'candidates' | 'total_votes'>): Promise<boolean> => {
+  const createElection = async (electionData: Omit<Election, 'id' | 'candidates' | 'total_votes' | 'created_by' | 'created_at' | 'updated_at'>): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('elections')
@@ -138,7 +143,7 @@ export const ElectionProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const addCandidate = async (candidateData: Omit<Candidate, 'id' | 'votes'>): Promise<boolean> => {
+  const addCandidate = async (candidateData: Omit<Candidate, 'id' | 'votes' | 'created_at'>): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('candidates')

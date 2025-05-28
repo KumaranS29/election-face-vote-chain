@@ -73,7 +73,9 @@ const CandidateDashboard = () => {
       email: user.email,
       party,
       manifesto,
-      electionId: selectedElection
+      election_id: selectedElection,
+      user_id: user.id,
+      image_url: null
     });
 
     toast({
@@ -225,8 +227,8 @@ const CandidateDashboard = () => {
                         <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                           <span className="text-purple-600">Vote Percentage</span>
                           <span className="font-bold text-purple-900">
-                            {election.totalVotes > 0 
-                              ? `${((candidate.votes / election.totalVotes) * 100).toFixed(1)}%`
+                            {election.total_votes > 0 
+                              ? `${((candidate.votes / election.total_votes) * 100).toFixed(1)}%`
                               : '0%'
                             }
                           </span>

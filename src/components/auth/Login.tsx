@@ -1,24 +1,24 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, Mail, Lock, Shield, Vote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Mail, Lock, Shield } from 'lucide-react';
 
 interface LoginProps {
   onToggle: () => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onToggle }) => {
-  const { login } = useAuth();
+  const { login, send2FACode } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,29 +26,27 @@ const Login: React.FC<LoginProps> = ({ onToggle }) => {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password, twoFactorCode);
+      const result = await login(email, password, twoFactorCode);
       
-      if (!success && email === 'kumaransenthilarasu@gmail.com' && !needsTwoFactor) {
-        setNeedsTwoFactor(true);
-        toast({
-          title: "2FA Required",
-          description: "Please enter your 2FA code. Demo code: 123456",
-          variant: "default"
-        });
-      } else if (success) {
+      if (result.success) {
         toast({
           title: "Login Successful",
-          description: "Welcome to VoteSecure!",
+          description: "Welcome back!",
+          variant: "default"
+        });
+      } else if (result.requires2FA) {
+        setShowTwoFactor(true);
+        toast({
+          title: "2FA Required",
+          description: "Please enter the verification code sent to your email.",
           variant: "default"
         });
       } else {
         toast({
           title: "Login Failed",
-          description: "Invalid credentials. Please try again.",
+          description: "Invalid credentials or 2FA code.",
           variant: "destructive"
         });
-        setNeedsTwoFactor(false);
-        setTwoFactorCode('');
       }
     } catch (error) {
       toast({
@@ -61,120 +59,115 @@ const Login: React.FC<LoginProps> = ({ onToggle }) => {
     }
   };
 
+  const handleResend2FA = async () => {
+    if (email) {
+      await send2FACode(email);
+      toast({
+        title: "Code Sent",
+        description: "A new verification code has been sent to your email.",
+        variant: "default"
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Vote className="w-8 h-8 text-white" />
+    <div className="flex items-center justify-center min-h-screen">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+          <CardDescription>Sign in to your voting account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  placeholder="Enter your email"
+                  required
+                  disabled={showTwoFactor}
+                />
+              </div>
             </div>
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            VoteSecure
-          </h1>
-          <p className="text-gray-600 mt-2">Secure Digital Voting Platform</p>
-        </div>
 
-        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
-            <CardDescription className="text-center">
-              Sign in to your account to continue
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10"
+                  placeholder="Enter your password"
+                  required
+                  disabled={showTwoFactor}
+                />
+              </div>
+            </div>
+
+            {showTwoFactor && (
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                <Label htmlFor="twoFactorCode">Verification Code</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Shield className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12"
-                    placeholder="Enter your email"
+                    id="twoFactorCode"
+                    type="text"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value)}
+                    className="pl-10"
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
                     required
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 h-12"
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
-              </div>
-
-              {needsTwoFactor && (
-                <div className="space-y-2">
-                  <Label htmlFor="twoFactor" className="text-sm font-medium">2FA Code</Label>
-                  <div className="relative">
-                    <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      id="twoFactor"
-                      type="text"
-                      value={twoFactorCode}
-                      onChange={(e) => setTwoFactorCode(e.target.value)}
-                      className="pl-10 h-12"
-                      placeholder="Enter 2FA code (Demo: 123456)"
-                      required
-                    />
-                  </div>
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-lg transition-all duration-200"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing In...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 pt-6 border-t">
-              <div className="text-center text-sm">
-                <span className="text-gray-600">Don't have an account? </span>
-                <button
-                  onClick={onToggle}
-                  className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={handleResend2FA}
+                  className="text-sm p-0 h-auto"
                 >
-                  Sign up here
-                </button>
+                  Resend Code
+                </Button>
               </div>
-            </div>
+            )}
 
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-              <h4 className="font-semibold text-blue-900 mb-2">Demo Credentials:</h4>
-              <div className="text-sm text-blue-800 space-y-1">
-                <div><strong>Admin:</strong> kumaransenthilarasu@gmail.com / SK29@2006</div>
-                <div><strong>2FA Code:</strong> 123456</div>
-                <div className="text-xs text-blue-600 mt-2">Register as Voter or Candidate to test other features</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Signing In...' : showTwoFactor ? 'Verify & Sign In' : 'Sign In'}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button
+                onClick={onToggle}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Sign up
+              </button>
+            </p>
+          </div>
+
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600 text-center">
+              Demo Admin: kumaransenthilarasu@gmail.com / SK29@2006 (No 2FA)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

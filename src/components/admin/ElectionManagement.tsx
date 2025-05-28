@@ -82,7 +82,7 @@ const ElectionManagement = () => {
                     <Vote className="w-5 h-5 text-blue-600" />
                     <div>
                       <div className="text-sm text-blue-600">Total Votes</div>
-                      <div className="font-semibold text-blue-900">{election.totalVotes}</div>
+                      <div className="font-semibold text-blue-900">{election.total_votes}</div>
                     </div>
                   </div>
                   
@@ -99,7 +99,7 @@ const ElectionManagement = () => {
                     <div>
                       <div className="text-sm text-purple-600">Start Date</div>
                       <div className="font-semibold text-purple-900">
-                        {new Date(election.startDate).toLocaleDateString()}
+                        {new Date(election.start_date).toLocaleDateString()}
                       </div>
                     </div>
                   </div>
@@ -129,8 +129,8 @@ const ElectionManagement = () => {
                           <div className="text-right">
                             <div className="font-semibold">{candidate.votes} votes</div>
                             <div className="text-xs text-gray-500">
-                              {election.totalVotes > 0 
-                                ? `${((candidate.votes / election.totalVotes) * 100).toFixed(1)}%`
+                              {election.total_votes > 0 
+                                ? `${((candidate.votes / election.total_votes) * 100).toFixed(1)}%`
                                 : '0%'
                               }
                             </div>

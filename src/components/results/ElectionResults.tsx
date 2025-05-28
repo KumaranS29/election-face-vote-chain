@@ -58,7 +58,7 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ electionId }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-600 text-sm font-medium">Total Votes</p>
-                <p className="text-3xl font-bold text-blue-900">{election.totalVotes}</p>
+                <p className="text-3xl font-bold text-blue-900">{election.total_votes}</p>
               </div>
               <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
                 <Vote className="w-6 h-6 text-white" />
@@ -103,7 +103,7 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ electionId }) => {
               <div>
                 <p className="text-orange-600 text-sm font-medium">Turnout</p>
                 <p className="text-3xl font-bold text-orange-900">
-                  {election.totalVotes > 0 ? '78%' : '0%'}
+                  {election.total_votes > 0 ? '78%' : '0%'}
                 </p>
               </div>
               <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
@@ -243,7 +243,7 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ electionId }) => {
               <div>
                 <div className="font-medium">Election Started</div>
                 <div className="text-sm text-gray-600">
-                  {new Date(election.startDate).toLocaleString()}
+                  {new Date(election.start_date).toLocaleString()}
                 </div>
               </div>
             </div>
@@ -252,7 +252,7 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ electionId }) => {
               <div>
                 <div className="font-medium">Election Ended</div>
                 <div className="text-sm text-gray-600">
-                  {new Date(election.endDate).toLocaleString()}
+                  {new Date(election.end_date).toLocaleString()}
                 </div>
               </div>
             </div>

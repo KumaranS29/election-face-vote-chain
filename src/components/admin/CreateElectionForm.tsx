@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 interface CreateElectionFormProps {
   onClose: () => void;
@@ -19,8 +20,9 @@ const CreateElectionForm: React.FC<CreateElectionFormProps> = ({ onClose }) => {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title || !description || !startDate || !endDate) {
@@ -41,26 +43,44 @@ const CreateElectionForm: React.FC<CreateElectionFormProps> = ({ onClose }) => {
       return;
     }
 
-    const now = new Date();
-    const start = new Date(startDate);
-    
-    const status = start > now ? 'upcoming' : 'active';
+    setIsSubmitting(true);
 
-    createElection({
-      title,
-      description,
-      startDate,
-      endDate,
-      status
-    });
+    try {
+      const now = new Date();
+      const start = new Date(startDate);
+      const status = start > now ? 'upcoming' : 'active';
 
-    toast({
-      title: "Election Created",
-      description: "New election has been created successfully.",
-      variant: "default"
-    });
+      const success = await createElection({
+        title,
+        description,
+        start_date: startDate,
+        end_date: endDate,
+        status
+      });
 
-    onClose();
+      if (success) {
+        toast({
+          title: "Election Created",
+          description: "New election has been created successfully.",
+          variant: "default"
+        });
+        onClose();
+      } else {
+        toast({
+          title: "Creation Failed",
+          description: "Failed to create election. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred while creating the election.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -122,11 +142,22 @@ const CreateElectionForm: React.FC<CreateElectionFormProps> = ({ onClose }) => {
           </div>
           
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-gradient-to-r from-blue-600 to-indigo-600">
-              Create Election
+            <Button 
+              type="submit" 
+              className="bg-gradient-to-r from-blue-600 to-indigo-600"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Election'
+              )}
             </Button>
           </div>
         </form>

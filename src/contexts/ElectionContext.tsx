@@ -1,5 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
 
 interface Candidate {
   id: string;
@@ -7,39 +9,42 @@ interface Candidate {
   email: string;
   party: string;
   manifesto: string;
-  electionId: string;
+  election_id: string;
   votes: number;
-  image?: string;
+  image_url?: string;
 }
 
 interface Election {
   id: string;
   title: string;
   description: string;
-  startDate: string;
-  endDate: string;
+  start_date: string;
+  end_date: string;
   status: 'upcoming' | 'active' | 'completed';
   candidates: Candidate[];
-  totalVotes: number;
+  total_votes: number;
 }
 
 interface Vote {
   id: string;
-  electionId: string;
-  candidateId: string;
-  voterId: string;
+  election_id: string;
+  candidate_id: string;
+  voter_id: string;
   timestamp: string;
   verified: boolean;
+  face_verification_data?: any;
 }
 
 interface ElectionContextType {
   elections: Election[];
   votes: Vote[];
-  createElection: (election: Omit<Election, 'id' | 'candidates' | 'totalVotes'>) => void;
-  addCandidate: (candidate: Omit<Candidate, 'id' | 'votes'>) => void;
-  submitVote: (electionId: string, candidateId: string, voterId: string) => boolean;
+  loading: boolean;
+  createElection: (election: Omit<Election, 'id' | 'candidates' | 'total_votes'>) => Promise<boolean>;
+  addCandidate: (candidate: Omit<Candidate, 'id' | 'votes'>) => Promise<boolean>;
+  submitVote: (electionId: string, candidateId: string, voterId: string, faceData?: any) => Promise<boolean>;
   getElectionResults: (electionId: string) => { candidate: Candidate; percentage: number }[];
-  updateElectionStatus: (electionId: string, status: Election['status']) => void;
+  updateElectionStatus: (electionId: string, status: Election['status']) => Promise<boolean>;
+  refreshData: () => Promise<void>;
 }
 
 const ElectionContext = createContext<ElectionContextType | undefined>(undefined);
@@ -55,144 +60,158 @@ export const useElection = () => {
 export const ElectionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [elections, setElections] = useState<Election[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const fetchElections = async () => {
+    try {
+      const { data: electionsData, error } = await supabase
+        .from('elections')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const electionsWithCandidates = await Promise.all(
+        (electionsData || []).map(async (election) => {
+          const { data: candidates } = await supabase
+            .from('candidates')
+            .select('*')
+            .eq('election_id', election.id);
+
+          return {
+            ...election,
+            candidates: candidates || []
+          };
+        })
+      );
+
+      setElections(electionsWithCandidates);
+    } catch (error) {
+      console.error('Error fetching elections:', error);
+    }
+  };
+
+  const fetchVotes = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: votesData, error } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('voter_id', user.id);
+
+      if (error) throw error;
+      setVotes(votesData || []);
+    } catch (error) {
+      console.error('Error fetching votes:', error);
+    }
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    await Promise.all([fetchElections(), fetchVotes()]);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    // Load data from localStorage
-    const storedElections = localStorage.getItem('voting_elections');
-    const storedVotes = localStorage.getItem('voting_votes');
-    
-    if (storedElections) {
-      setElections(JSON.parse(storedElections));
-    } else {
-      // Initialize with sample election
-      const sampleElection: Election = {
-        id: 'election-1',
-        title: 'Presidential Election 2024',
-        description: 'National Presidential Election',
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active',
-        candidates: [],
-        totalVotes: 0
-      };
-      setElections([sampleElection]);
-      localStorage.setItem('voting_elections', JSON.stringify([sampleElection]));
+    if (user) {
+      refreshData();
     }
-    
-    if (storedVotes) {
-      setVotes(JSON.parse(storedVotes));
-    }
-  }, []);
+  }, [user]);
 
-  const createElection = (electionData: Omit<Election, 'id' | 'candidates' | 'totalVotes'>) => {
-    const newElection: Election = {
-      ...electionData,
-      id: `election-${Date.now()}`,
-      candidates: [],
-      totalVotes: 0
-    };
-    
-    const updatedElections = [...elections, newElection];
-    setElections(updatedElections);
-    localStorage.setItem('voting_elections', JSON.stringify(updatedElections));
-  };
+  const createElection = async (electionData: Omit<Election, 'id' | 'candidates' | 'total_votes'>): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('elections')
+        .insert([{
+          ...electionData,
+          created_by: user?.id
+        }]);
 
-  const addCandidate = (candidateData: Omit<Candidate, 'id' | 'votes'>) => {
-    const newCandidate: Candidate = {
-      ...candidateData,
-      id: `candidate-${Date.now()}`,
-      votes: 0
-    };
-    
-    const updatedElections = elections.map(election => {
-      if (election.id === candidateData.electionId) {
-        return {
-          ...election,
-          candidates: [...election.candidates, newCandidate]
-        };
-      }
-      return election;
-    });
-    
-    setElections(updatedElections);
-    localStorage.setItem('voting_elections', JSON.stringify(updatedElections));
-  };
-
-  const submitVote = (electionId: string, candidateId: string, voterId: string): boolean => {
-    // Check if voter has already voted
-    const existingVote = votes.find(vote => vote.electionId === electionId && vote.voterId === voterId);
-    if (existingVote) {
+      if (error) throw error;
+      await fetchElections();
+      return true;
+    } catch (error) {
+      console.error('Error creating election:', error);
       return false;
     }
-    
-    const newVote: Vote = {
-      id: `vote-${Date.now()}`,
-      electionId,
-      candidateId,
-      voterId,
-      timestamp: new Date().toISOString(),
-      verified: true
-    };
-    
-    const updatedVotes = [...votes, newVote];
-    setVotes(updatedVotes);
-    localStorage.setItem('voting_votes', JSON.stringify(updatedVotes));
-    
-    // Update election and candidate vote counts
-    const updatedElections = elections.map(election => {
-      if (election.id === electionId) {
-        const updatedCandidates = election.candidates.map(candidate => {
-          if (candidate.id === candidateId) {
-            return { ...candidate, votes: candidate.votes + 1 };
-          }
-          return candidate;
-        });
-        
-        return {
-          ...election,
-          candidates: updatedCandidates,
-          totalVotes: election.totalVotes + 1
-        };
-      }
-      return election;
-    });
-    
-    setElections(updatedElections);
-    localStorage.setItem('voting_elections', JSON.stringify(updatedElections));
-    
-    return true;
+  };
+
+  const addCandidate = async (candidateData: Omit<Candidate, 'id' | 'votes'>): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('candidates')
+        .insert([{
+          ...candidateData,
+          user_id: user?.id
+        }]);
+
+      if (error) throw error;
+      await fetchElections();
+      return true;
+    } catch (error) {
+      console.error('Error adding candidate:', error);
+      return false;
+    }
+  };
+
+  const submitVote = async (electionId: string, candidateId: string, voterId: string, faceData?: any): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('votes')
+        .insert([{
+          election_id: electionId,
+          candidate_id: candidateId,
+          voter_id: voterId,
+          face_verification_data: faceData
+        }]);
+
+      if (error) throw error;
+      await Promise.all([fetchElections(), fetchVotes()]);
+      return true;
+    } catch (error) {
+      console.error('Error submitting vote:', error);
+      return false;
+    }
   };
 
   const getElectionResults = (electionId: string): { candidate: Candidate; percentage: number }[] => {
     const election = elections.find(e => e.id === electionId);
-    if (!election || election.totalVotes === 0) return [];
+    if (!election || election.total_votes === 0) return [];
     
     return election.candidates.map(candidate => ({
       candidate,
-      percentage: (candidate.votes / election.totalVotes) * 100
+      percentage: (candidate.votes / election.total_votes) * 100
     })).sort((a, b) => b.candidate.votes - a.candidate.votes);
   };
 
-  const updateElectionStatus = (electionId: string, status: Election['status']) => {
-    const updatedElections = elections.map(election => {
-      if (election.id === electionId) {
-        return { ...election, status };
-      }
-      return election;
-    });
-    
-    setElections(updatedElections);
-    localStorage.setItem('voting_elections', JSON.stringify(updatedElections));
+  const updateElectionStatus = async (electionId: string, status: Election['status']): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('elections')
+        .update({ status })
+        .eq('id', electionId);
+
+      if (error) throw error;
+      await fetchElections();
+      return true;
+    } catch (error) {
+      console.error('Error updating election status:', error);
+      return false;
+    }
   };
 
   const value = {
     elections,
     votes,
+    loading,
     createElection,
     addCandidate,
     submitVote,
     getElectionResults,
-    updateElectionStatus
+    updateElectionStatus,
+    refreshData
   };
 
   return (

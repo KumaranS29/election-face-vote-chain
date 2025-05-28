@@ -5,21 +5,22 @@ import { useElection } from '../../contexts/ElectionContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Vote, CheckCircle, Clock, Trophy, Camera, Shield, Users } from 'lucide-react';
+import { Vote, CheckCircle, Clock, Trophy, Camera, Shield, Users, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FaceVerificationModal from './FaceVerificationModal';
 
 const VoterDashboard = () => {
   const { user } = useAuth();
-  const { elections, votes, submitVote } = useElection();
+  const { elections, votes, submitVote, loading, refreshData } = useElection();
   const { toast } = useToast();
   const [selectedCandidate, setSelectedCandidate] = useState<string | null>(null);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [votingElectionId, setVotingElectionId] = useState<string | null>(null);
+  const [submittingVote, setSubmittingVote] = useState(false);
 
   const activeElections = elections.filter(e => e.status === 'active');
-  const userVotes = votes.filter(v => v.voterId === user?.id);
-  const votedElectionIds = new Set(userVotes.map(v => v.electionId));
+  const userVotes = votes.filter(v => v.voter_id === user?.id);
+  const votedElectionIds = new Set(userVotes.map(v => v.election_id));
 
   const handleVoteClick = (electionId: string, candidateId: string) => {
     if (!user) return;
@@ -38,29 +39,52 @@ const VoterDashboard = () => {
     setShowFaceVerification(true);
   };
 
-  const handleFaceVerificationSuccess = () => {
+  const handleFaceVerificationSuccess = async (faceData?: any) => {
     if (!user || !votingElectionId || !selectedCandidate) return;
 
-    const success = submitVote(votingElectionId, selectedCandidate, user.id);
+    setSubmittingVote(true);
     
-    if (success) {
+    try {
+      const success = await submitVote(votingElectionId, selectedCandidate, user.id, faceData);
+      
+      if (success) {
+        toast({
+          title: "Vote Submitted",
+          description: "Your vote has been recorded successfully!",
+          variant: "default"
+        });
+        await refreshData(); // Refresh data to show updated vote counts
+      } else {
+        toast({
+          title: "Vote Failed",
+          description: "Failed to submit your vote. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Vote Submitted",
-        description: "Your vote has been recorded successfully!",
-        variant: "default"
-      });
-    } else {
-      toast({
-        title: "Vote Failed",
-        description: "Failed to submit your vote. Please try again.",
+        title: "Error",
+        description: "An error occurred while submitting your vote.",
         variant: "destructive"
       });
+    } finally {
+      setSubmittingVote(false);
+      setShowFaceVerification(false);
+      setSelectedCandidate(null);
+      setVotingElectionId(null);
     }
-
-    setShowFaceVerification(false);
-    setSelectedCandidate(null);
-    setVotingElectionId(null);
   };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading elections...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
@@ -92,7 +116,7 @@ const VoterDashboard = () => {
           <CardContent className="p-6 text-center">
             <Shield className="w-8 h-8 text-purple-600 mx-auto mb-3" />
             <h3 className="font-semibold text-purple-900">Security Status</h3>
-            <p className="text-sm font-bold text-purple-800">Verified</p>
+            <p className="text-sm font-bold text-purple-800">Face Verified</p>
           </CardContent>
         </Card>
       </div>
@@ -112,9 +136,9 @@ const VoterDashboard = () => {
         ) : (
           activeElections.map((election) => {
             const hasVoted = votedElectionIds.has(election.id);
-            const userVote = userVotes.find(v => v.electionId === election.id);
+            const userVote = userVotes.find(v => v.election_id === election.id);
             const votedCandidate = userVote 
-              ? election.candidates.find(c => c.id === userVote.candidateId)
+              ? election.candidates.find(c => c.id === userVote.candidate_id)
               : null;
 
             return (
@@ -164,10 +188,14 @@ const VoterDashboard = () => {
                                 <h5 className="font-semibold text-lg">{candidate.name}</h5>
                                 <p className="text-blue-600 font-medium">{candidate.party}</p>
                                 <p className="text-gray-600 text-sm mt-2">{candidate.manifesto}</p>
+                                <div className="mt-2 text-sm text-gray-500">
+                                  Current votes: {candidate.votes}
+                                </div>
                               </div>
                               <Button
                                 onClick={() => handleVoteClick(election.id, candidate.id)}
                                 className="ml-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+                                disabled={submittingVote}
                               >
                                 <Vote className="w-4 h-4 mr-2" />
                                 Vote
@@ -207,8 +235,8 @@ const VoterDashboard = () => {
         ) : (
           <div className="grid gap-4">
             {userVotes.map((vote) => {
-              const election = elections.find(e => e.id === vote.electionId);
-              const candidate = election?.candidates.find(c => c.id === vote.candidateId);
+              const election = elections.find(e => e.id === vote.election_id);
+              const candidate = election?.candidates.find(c => c.id === vote.candidate_id);
               
               return (
                 <Card key={vote.id}>
@@ -219,6 +247,12 @@ const VoterDashboard = () => {
                         <p className="text-sm text-gray-600">
                           Voted for: <span className="font-medium text-green-600">{candidate?.name}</span>
                         </p>
+                        {vote.verified && (
+                          <p className="text-xs text-blue-600 flex items-center mt-1">
+                            <Shield className="w-3 h-3 mr-1" />
+                            Face verified
+                          </p>
+                        )}
                       </div>
                       <div className="text-right text-sm text-gray-500">
                         <div>{new Date(vote.timestamp).toLocaleDateString()}</div>

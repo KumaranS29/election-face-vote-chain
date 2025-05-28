@@ -1,12 +1,10 @@
 
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from '../components/auth/Login';
 import Register from '../components/auth/Register';
 import AdminDashboard from '../components/admin/AdminDashboard';
 import VoterDashboard from '../components/voter/VoterDashboard';
 import CandidateDashboard from '../components/candidate/CandidateDashboard';
-import ElectionResults from '../components/results/ElectionResults';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ElectionProvider } from '../contexts/ElectionContext';
 import Navbar from '../components/layout/Navbar';
@@ -31,24 +29,24 @@ const AppContent = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <main className="pt-16">
-        {user?.role === 'admin' && <AdminDashboard />}
-        {user?.role === 'voter' && <VoterDashboard />}
-        {user?.role === 'candidate' && <CandidateDashboard />}
-      </main>
-    </div>
+    <ElectionProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="pt-16">
+          {user?.role === 'admin' && <AdminDashboard />}
+          {user?.role === 'voter' && <VoterDashboard />}
+          {user?.role === 'candidate' && <CandidateDashboard />}
+        </main>
+      </div>
+    </ElectionProvider>
   );
 };
 
 const Index = () => {
   return (
     <AuthProvider>
-      <ElectionProvider>
-        <AppContent />
-        <Toaster />
-      </ElectionProvider>
+      <AppContent />
+      <Toaster />
     </AuthProvider>
   );
 };

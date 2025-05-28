@@ -1,23 +1,22 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
 
-interface User {
+interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: 'admin' | 'voter' | 'candidate';
-  hasVoted?: boolean;
-  twoFactorEnabled?: boolean;
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
+  session: Session | null;
   isAuthenticated: boolean;
   login: (email: string, password: string, twoFactorCode?: string) => Promise<boolean>;
   register: (email: string, password: string, name: string, role: 'voter' | 'candidate') => Promise<boolean>;
-  logout: () => void;
-  enableTwoFactor: () => Promise<string>;
-  verifyTwoFactor: (code: string) => boolean;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,112 +30,101 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Initialize with admin user
-    const initialUsers: User[] = [
-      {
-        id: 'admin-1',
-        email: 'kumaransenthilarasu@gmail.com',
-        name: 'Admin User',
-        role: 'admin',
-        twoFactorEnabled: true
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          // Fetch user profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (profile) {
+            setUser({
+              id: profile.id,
+              email: profile.email,
+              name: profile.name,
+              role: profile.role
+            });
+          }
+        } else {
+          setUser(null);
+        }
       }
-    ];
-    
-    const storedUsers = localStorage.getItem('voting_users');
-    const storedCurrentUser = localStorage.getItem('voting_current_user');
-    
-    if (storedUsers) {
-      const parsedUsers = JSON.parse(storedUsers);
-      setUsers(parsedUsers);
-    } else {
-      setUsers(initialUsers);
-      localStorage.setItem('voting_users', JSON.stringify(initialUsers));
-    }
-    
-    if (storedCurrentUser) {
-      setUser(JSON.parse(storedCurrentUser));
-    }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setSession(session);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string, twoFactorCode?: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = users.find(u => u.email === email);
-    
-    if (!foundUser) return false;
-    
-    // For demo purposes, accept the hardcoded admin password or any password for other users
-    const isValidPassword = (email === 'kumaransenthilarasu@gmail.com' && password === 'SK29@2006') || 
-                           (email !== 'kumaransenthilarasu@gmail.com' && password.length >= 6);
-    
-    if (!isValidPassword) return false;
-    
-    // Check 2FA for admin
-    if (foundUser.twoFactorEnabled && !twoFactorCode) {
-      return false; // Need 2FA code
+    try {
+      // For demo purposes, check if this is the admin account requiring 2FA
+      if (email === 'kumaransenthilarasu@gmail.com' && password === 'SK29@2006') {
+        if (!twoFactorCode || twoFactorCode !== '123456') {
+          return false; // Requires 2FA
+        }
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    
-    if (foundUser.twoFactorEnabled && twoFactorCode !== '123456') {
-      return false; // Invalid 2FA code
-    }
-    
-    setUser(foundUser);
-    localStorage.setItem('voting_current_user', JSON.stringify(foundUser));
-    return true;
   };
 
   const register = async (email: string, password: string, name: string, role: 'voter' | 'candidate'): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (users.find(u => u.email === email)) {
-      return false; // User already exists
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role
+          }
+        }
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Registration error:', error);
+      return false;
     }
-    
-    const newUser: User = {
-      id: `${role}-${Date.now()}`,
-      email,
-      name,
-      role,
-      hasVoted: false,
-      twoFactorEnabled: false
-    };
-    
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
-    localStorage.setItem('voting_users', JSON.stringify(updatedUsers));
-    
-    return true;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('voting_current_user');
-  };
-
-  const enableTwoFactor = async (): Promise<string> => {
-    // Simulate API call to generate QR code
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return 'JBSWY3DPEHPK3PXP'; // Mock secret key
-  };
-
-  const verifyTwoFactor = (code: string): boolean => {
-    return code === '123456'; // Mock verification
+  const logout = async (): Promise<void> => {
+    await supabase.auth.signOut();
   };
 
   const value = {
     user,
-    isAuthenticated: !!user,
+    session,
+    isAuthenticated: !!session,
     login,
     register,
-    logout,
-    enableTwoFactor,
-    verifyTwoFactor
+    logout
   };
 
   return (

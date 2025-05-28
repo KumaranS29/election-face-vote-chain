@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Vote, Users, Trophy, Calendar, Plus, Activity, TrendingUp } from 'lucide-react';
+import { Vote, Users, Trophy, Calendar, Plus, Activity, TrendingUp, Loader2 } from 'lucide-react';
 import CreateElectionForm from './CreateElectionForm';
 import ElectionManagement from './ElectionManagement';
 
 const AdminDashboard = () => {
-  const { elections, votes } = useElection();
+  const { elections, votes, loading } = useElection();
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const totalElections = elections.length;
@@ -21,7 +21,7 @@ const AdminDashboard = () => {
 
   const electionStats = elections.map(election => ({
     name: election.title.substring(0, 20) + '...',
-    votes: election.totalVotes,
+    votes: election.total_votes,
     candidates: election.candidates.length
   }));
 
@@ -30,6 +30,17 @@ const AdminDashboard = () => {
     { name: 'Completed', value: elections.filter(e => e.status === 'completed').length, color: '#6366F1' },
     { name: 'Upcoming', value: elections.filter(e => e.status === 'upcoming').length, color: '#F59E0B' }
   ];
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
@@ -194,7 +205,7 @@ const AdminDashboard = () => {
                         {election.status}
                       </Badge>
                       <div className="text-right text-sm">
-                        <div className="font-medium">{election.totalVotes} votes</div>
+                        <div className="font-medium">{election.total_votes} votes</div>
                         <div className="text-gray-500">{election.candidates.length} candidates</div>
                       </div>
                     </div>

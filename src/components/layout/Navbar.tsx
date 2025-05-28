@@ -3,9 +3,28 @@ import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Shield, Vote } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+        variant: "default"
+      });
+    } catch (error) {
+      toast({
+        title: "Logout Error",
+        description: "There was an error logging out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const getRoleIcon = () => {
     switch (user?.role) {
@@ -60,7 +79,7 @@ const Navbar = () => {
             </div>
             
             <Button
-              onClick={logout}
+              onClick={handleLogout}
               variant="outline"
               size="sm"
               className="flex items-center space-x-2"

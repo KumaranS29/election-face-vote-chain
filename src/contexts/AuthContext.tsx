@@ -38,23 +38,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session);
         setSession(session);
         
         if (session?.user) {
-          // Fetch user profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (profile) {
+          // For admin account, create user object directly
+          if (session.user.email === 'kumaransenthilarasu@gmail.com') {
             setUser({
-              id: profile.id,
-              email: profile.email,
-              name: profile.name,
-              role: profile.role as 'admin' | 'voter' | 'candidate'
+              id: session.user.id,
+              email: session.user.email,
+              name: 'Admin User',
+              role: 'admin'
             });
+          } else {
+            // Fetch user profile for other users
+            try {
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (profile && !error) {
+                setUser({
+                  id: profile.id,
+                  email: profile.email,
+                  name: profile.name,
+                  role: profile.role as 'admin' | 'voter' | 'candidate'
+                });
+              } else {
+                console.error('Error fetching profile:', error);
+              }
+            } catch (error) {
+              console.error('Error in profile fetch:', error);
+            }
           }
         } else {
           setUser(null);
@@ -93,6 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string, twoFactorCode?: string): Promise<{ success: boolean; requires2FA?: boolean }> => {
     try {
+      console.log('Login attempt for:', email);
+      
       // For admin account, allow direct login without 2FA
       if (email === 'kumaransenthilarasu@gmail.com' && password === 'SK29@2006') {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -100,7 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Admin login error:', error);
+          throw error;
+        }
+        console.log('Admin login successful');
         return { success: true };
       }
 
@@ -161,7 +184,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async (): Promise<void> => {
-    await supabase.auth.signOut();
+    try {
+      console.log('Logging out...');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+      } else {
+        console.log('Logout successful');
+        setUser(null);
+        setSession(null);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const value = {

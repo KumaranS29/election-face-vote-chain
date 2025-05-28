@@ -1,13 +1,55 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from '../components/auth/Login';
+import Register from '../components/auth/Register';
+import AdminDashboard from '../components/admin/AdminDashboard';
+import VoterDashboard from '../components/voter/VoterDashboard';
+import CandidateDashboard from '../components/candidate/CandidateDashboard';
+import ElectionResults from '../components/results/ElectionResults';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { ElectionProvider } from '../contexts/ElectionContext';
+import Navbar from '../components/layout/Navbar';
+import { Toaster } from '@/components/ui/toaster';
+
+const AppContent = () => {
+  const { user, isAuthenticated } = useAuth();
+  const [showRegister, setShowRegister] = useState(false);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <div className="container mx-auto px-4 py-8">
+          {showRegister ? (
+            <Register onToggle={() => setShowRegister(false)} />
+          ) : (
+            <Login onToggle={() => setShowRegister(true)} />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="pt-16">
+        {user?.role === 'admin' && <AdminDashboard />}
+        {user?.role === 'voter' && <VoterDashboard />}
+        {user?.role === 'candidate' && <CandidateDashboard />}
+      </main>
+    </div>
+  );
+};
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <AuthProvider>
+      <ElectionProvider>
+        <AppContent />
+        <Toaster />
+      </ElectionProvider>
+    </AuthProvider>
   );
 };
 

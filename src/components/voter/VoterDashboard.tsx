@@ -5,7 +5,7 @@ import { useElection } from '../../contexts/ElectionContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Vote, CheckCircle, Clock, Trophy, Camera, Shield } from 'lucide-react';
+import { Vote, CheckCircle, Clock, Trophy, Camera, Shield, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FaceVerificationModal from './FaceVerificationModal';
 

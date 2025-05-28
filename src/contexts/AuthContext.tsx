@@ -42,40 +42,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         
         if (session?.user) {
-          // For admin account, create user object directly
-          if (session.user.email === 'kumaransenthilarasu@gmail.com') {
-            setUser({
-              id: session.user.id,
-              email: session.user.email,
-              name: 'Admin User',
-              role: 'admin'
-            });
-          } else {
-            // Fetch user profile for other users
-            try {
-              const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (profile && !error) {
-                setUser({
-                  id: profile.id,
-                  email: profile.email,
-                  name: profile.name,
-                  role: profile.role as 'admin' | 'voter' | 'candidate'
-                });
-              } else {
-                console.error('Error fetching profile:', error);
-              }
-            } catch (error) {
-              console.error('Error in profile fetch:', error);
-            }
-          }
-        } else {
-          setUser(null);
-        }
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profile && !error) {
+      setUser({
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        role: profile.role as 'admin' | 'voter' | 'candidate'
+      });
+    } else {
+      // If the profile doesn't exist, check if it's admin and fallback
+      if (session.user.email === 'kumaransenthilarasu@gmail.com') {
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          name: 'Admin User',
+          role: 'admin'
+        });
+      } else {
+        console.error('User profile not found:', error);
+        setUser(null);
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching profile:', err);
+    setUser(null);
+  }
+} else {
+  setUser(null);
+}
+
       }
     );
 
